@@ -2,6 +2,7 @@
 
 Next Release
 -----
+* report an unlimited matrix-interface timeout as None, so cloning a hybrid model onto GLPK does not apply a zero time limit
 
 1.9.1
 -----

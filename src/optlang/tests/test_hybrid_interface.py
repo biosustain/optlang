@@ -488,6 +488,18 @@ else:
 
             self.assertRaises(ValueError, setattr, self.configuration, "presolve", "what?")
 
+        def test_unlimited_timeout_clones_to_glpk(self):
+            from optlang.glpk_interface import Model as GlpkModel
+
+            x = Variable("x", lb=0)
+            self.model.add([x, Constraint(x, ub=1)])
+            self.model.objective = Objective(x, direction="max")
+            self.assertIsNone(self.model.configuration.timeout)
+            cloned = GlpkModel.clone(self.model)
+            self.assertIsNone(cloned.configuration.timeout)
+            self.assertEqual(cloned.optimize(), OPTIMAL)
+            self.assertAlmostEqual(cloned.variables["x"].primal, 1.0)
+
 
     class QuadraticProgrammingTestCase(abstract_test_cases.AbstractQuadraticProgrammingTestCase):
         def setUp(self):
