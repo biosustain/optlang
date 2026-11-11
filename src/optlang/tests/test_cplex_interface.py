@@ -173,6 +173,43 @@ else:
             model_copy = copy.copy(self.model)
             self.assertEqual(model_copy.configuration.verbosity, 3)
 
+        def test_pickle_keeps_configuration(self):
+            configuration = self.model.configuration
+            configuration.lp_method = "dual"
+            configuration.qp_method = "barrier"
+            configuration.solution_target = "convex"
+            configuration.presolve = True
+            configuration.timeout = 60
+            configuration.tolerances.feasibility = 1e-8
+            configuration.tolerances.optimality = 1e-8
+            configuration.tolerances.integrality = 1e-8
+            from_pickle = pickle.loads(pickle.dumps(self.model)).configuration
+            self.assertEqual(from_pickle.lp_method, "dual")
+            self.assertEqual(from_pickle.qp_method, "barrier")
+            self.assertEqual(from_pickle.solution_target, "convex")
+            self.assertEqual(from_pickle.presolve, True)
+            self.assertEqual(from_pickle.timeout, 60)
+            self.assertEqual(from_pickle.tolerances.to_dict(), configuration.tolerances.to_dict())
+
+        def test_load_model_pickled_by_previous_version(self):
+            # checks the compatibility with models pickled by optlang <= 1.9.1, which stored the configuration itself
+            self.model.configuration.timeout = 60
+            state = self.model.__getstate__()
+            state = {'cplex_binary': state['cplex_binary'], 'status': state['status'],
+                     'config': self.model.configuration}
+            model = self.interface.Model.__new__(self.interface.Model)
+            model.__setstate__(pickle.loads(pickle.dumps(state)))
+            self.assertEqual(model.configuration.timeout, 60)
+            self.assertEqual(len(model.variables), len(self.model.variables))
+
+        def test_pickle_keeps_parameters_set_on_problem(self):
+            parameters = self.model.problem.parameters
+            parameters.threads.set(2)
+            parameters.mip.tolerances.mipgap.set(0.05)
+            from_pickle = pickle.loads(pickle.dumps(self.model)).problem.parameters
+            self.assertEqual(from_pickle.threads.get(), 2)
+            self.assertEqual(from_pickle.mip.tolerances.mipgap.get(), 0.05)
+
         def test_init_from_existing_problem(self):
             inner_prob = self.model.problem
             self.assertEqual(len(self.model.variables), inner_prob.variables.get_num())

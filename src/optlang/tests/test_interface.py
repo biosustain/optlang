@@ -1,6 +1,8 @@
 # Copyright (c) 2013 Novo Nordisk Foundation Center for Biosustainability, DTU.
 # See LICENSE for details.
 
+import copy
+import pickle
 import sys
 from unittest import TestCase
 
@@ -24,6 +26,11 @@ class TestModel(TestCase):
         self.assertRaises(AttributeError, setattr, self.model, 'variables', 'Foo')
         self.assertRaises(AttributeError, setattr, self.model, 'constraints', 'Foo')
         self.assertRaises(AttributeError, setattr, self.model, 'status', 'Foo')
+
+    def test_pickle_and_copy(self):
+        for model in (pickle.loads(pickle.dumps(self.model)), copy.copy(self.model), copy.deepcopy(self.model)):
+            self.assertEqual(list(model.variables.keys()), ["x", "y"])
+            self.assertEqual(list(model.constraints.keys()), ["constr1"])
 
     def test_create_empty_model(self):
         model = Model()

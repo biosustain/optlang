@@ -140,6 +140,13 @@ class ModelTestCase(abstract_test_cases.AbstractModelTestCase):
         self.assertEqual([(constr.lb, constr.ub, constr.name) for constr in from_pickle.constraints],
                          [(constr.lb, constr.ub, constr.name) for constr in self.model.constraints])
 
+    def test_pickle_keeps_configuration(self):
+        self.model.configuration.verbosity = 3
+        self.model.configuration.tolerance = 1e-6
+        from_pickle = pickle.loads(pickle.dumps(self.model)).configuration
+        self.assertEqual(from_pickle.verbosity, 3)
+        self.assertEqual(from_pickle.tolerance, 1e-6)
+
     @unittest.skip("Not implemented yet")
     def test_config_gets_copied_too(self):
         self.assertEquals(self.model.configuration.verbosity, 0)

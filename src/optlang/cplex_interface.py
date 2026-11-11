@@ -161,6 +161,19 @@ def _constraint_lb_and_ub_to_cplex_sense_rhs_and_range_value(lb, ub):
     return sense, rhs, range_value
 
 
+def _get_solver_parameters(problem):
+    """Return the numeric parameters of a CPLEX problem that differ from their defaults."""
+    return {repr(parameter): value for parameter, value in problem.parameters.get_changed()
+            if not isinstance(value, str)}
+
+
+def _set_solver_parameters(problem, parameters):
+    """Set the given parameters of a CPLEX problem."""
+    for parameter, _ in problem.parameters.get_all():
+        if repr(parameter) in parameters:
+            parameter.set(parameters[repr(parameter)])
+
+
 class Variable(interface.Variable, metaclass=inheritdocstring):
     def __init__(self, name, *args, **kwargs):
         super(Variable, self).__init__(name, **kwargs)
@@ -689,7 +702,9 @@ class Model(interface.Model, metaclass=inheritdocstring):
             self.problem.write(tmp_file_name)
             with open(tmp_file_name, "rb") as tmp_file:
                 cplex_binary = tmp_file.read()
-        repr_dict = {'cplex_binary': cplex_binary, 'status': self.status, 'config': self.configuration}
+        repr_dict = {'cplex_binary': cplex_binary, 'status': self.status,
+                     'configuration': Configuration._get_parameters(self.configuration),
+                     'parameters': _get_solver_parameters(self.problem)}
         return repr_dict
 
     def __setstate__(self, repr_dict):
@@ -706,7 +721,11 @@ class Model(interface.Model, metaclass=inheritdocstring):
         if repr_dict['status'] == 'optimal':
             problem.solve()  # since the start is an optimal solution, nothing will happen here
         self.__init__(problem=problem)
-        self.configuration = Configuration.clone(repr_dict['config'], problem=self)
+        if 'configuration' in repr_dict:
+            self.configuration = Configuration(problem=self, **repr_dict['configuration'])
+            _set_solver_parameters(problem, repr_dict['parameters'])
+        else:  # pickled by optlang <= 1.9.1
+            self.configuration = Configuration.clone(repr_dict['config'], problem=self)
 
     @property
     def objective(self):

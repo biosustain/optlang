@@ -24,6 +24,8 @@ GLPK is an open source LP solver, with MILP capabilities.
 To use GLPK you need to install the 'swiglpk' python package (with pip or from http://github.com/biosustain/swiglpk)
 and make sure that 'import swiglpk' runs without error.
 """
+import copy
+import inspect
 import logging
 
 from optlang.util import inheritdocstring, TemporaryFilename
@@ -73,6 +75,17 @@ def _glpk_validate_id(name):
         return
     if len(name) > 256:
         raise ValueError("GLPK does not support ID's longer than 256 characters")
+
+
+def _get_solver_parameters(control_parameters):
+    """Return the numeric fields of GLPK control parameters (glp_smcp or glp_iocp)."""
+    return {name: value for name, value in inspect.getmembers(control_parameters) if type(value) in (int, float)}
+
+
+def _set_solver_parameters(control_parameters, parameters):
+    """Set the given fields of GLPK control parameters (glp_smcp or glp_iocp)."""
+    for name, value in parameters.items():
+        setattr(control_parameters, name, value)
 
 
 class Variable(interface.Variable, metaclass=inheritdocstring):
@@ -390,17 +403,22 @@ class Configuration(interface.MathematicalProgrammingConfiguration, metaclass=in
         return {'presolve': self.presolve,
                 'verbosity': self.verbosity,
                 'timeout': self.timeout,
-                'tolerances': {"feasibility": self.tolerances.feasibility}
+                'tolerances': {"feasibility": self.tolerances.feasibility},
+                'smcp': _get_solver_parameters(self._smcp),
+                'iocp': _get_solver_parameters(self._iocp)
                 }
 
     def __setstate__(self, state):
         self.__init__()
         for key, val in state.items():
-            if key != "tolerances":
+            if key not in ("tolerances", "smcp", "iocp"):
                 setattr(self, key, val)
         for key, val in state["tolerances"].items():
             if key in self._tolerance_functions():
                 setattr(self.tolerances, key, val)
+        # set last, the properties above write to the same fields
+        _set_solver_parameters(self._smcp, state.get("smcp", {}))
+        _set_solver_parameters(self._iocp, state.get("iocp", {}))
 
     def _set_presolve(self, value):
         self._smcp.presolve = {False: GLP_OFF, True: GLP_ON, "auto": GLP_OFF}[value]
@@ -597,7 +615,9 @@ class Model(interface.Model, metaclass=inheritdocstring):
                                 " does not seem to contain a valid GLPK problem:\n\n" +
                                 invalid_problem)
         self.__init__(problem=problem)
-        self.configuration = Configuration.clone(repr_dict['config'], problem=self)
+        # copy.copy(model) passes the configuration of the original model, which must not be shared
+        self.configuration = copy.copy(repr_dict['config'])
+        self.configuration.problem = self
         if repr_dict['glpk_status'] == 'optimal':
             self.optimize()  # since the start is an optimal solution, nothing will happen here
 

@@ -151,6 +151,21 @@ else:
             self.assertEqual([(constr.lb, constr.ub, constr.name) for constr in from_pickle.constraints],
                              [(constr.lb, constr.ub, constr.name) for constr in self.model.constraints])
 
+        def test_pickle_keeps_configuration(self):
+            configuration = self.model.configuration
+            configuration.presolve = True
+            configuration.timeout = 60
+            configuration.max_nodes = 10
+            configuration.threads = 2
+            configuration.tolerances.feasibility = 1e-8
+            configuration.tolerances.integrality = 1e-8
+            from_pickle = pickle.loads(pickle.dumps(self.model)).configuration
+            self.assertEqual(from_pickle.presolve, True)
+            self.assertEqual(from_pickle.timeout, 60)
+            self.assertEqual(from_pickle.max_nodes, 10)
+            self.assertEqual(from_pickle.threads, 2)
+            self.assertEqual(from_pickle.tolerances.to_dict(), configuration.tolerances.to_dict())
+
         def test_config_gets_copied_too(self):
             self.assertEqual(self.model.configuration.verbosity, 0)
             self.model.configuration.verbosity = 3
