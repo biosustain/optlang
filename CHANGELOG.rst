@@ -2,6 +2,8 @@
 
 Next Release
 -----
+* validate GLPK optimal MIP primal equalities and bounds, retry invalid solutions
+  without presolve, and report undefined if the retry is still invalid
 
 1.9.1
 -----
