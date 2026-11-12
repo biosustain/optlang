@@ -25,6 +25,7 @@ To use GLPK you need to install the 'swiglpk' python package (with pip or from h
 and make sure that 'import swiglpk' runs without error.
 """
 import logging
+from math import isfinite
 
 from optlang.util import inheritdocstring, TemporaryFilename
 from optlang.expression_parsing import parse_optimization_expression
@@ -43,7 +44,8 @@ from swiglpk import glp_find_col, glp_get_col_prim, glp_get_col_dual, GLP_CV, GL
     glp_get_mat_row, glp_get_row_ub, glp_get_row_type, glp_get_row_lb, glp_get_row_name, glp_get_obj_coef, \
     glp_get_obj_dir, glp_scale_prob, GLP_SF_AUTO, glp_get_num_int, glp_mip_col_val, \
     glp_mip_obj_val, glp_mip_status, GLP_ETMLIM, glp_adv_basis, glp_read_lp, glp_mip_row_val, \
-    get_col_primals, get_col_duals, get_row_primals, get_row_duals
+    get_col_primals, get_col_duals, get_row_primals, get_row_duals, \
+    glp_check_kkt, GLP_MIP, GLP_KKT_PE, GLP_KKT_PB
 
 
 _GLPK_STATUS_TO_STATUS = {
@@ -695,6 +697,21 @@ class Model(interface.Model, metaclass=inheritdocstring):
                 log.debug("Status undefined. GLPK status code returned by glp_intopt was %d" % return_value)
         return status
 
+    def _mip_solution_is_feasible(self):
+        """Check original primal equalities and bounds of a MIP solution."""
+        tolerance = self.configuration.tolerances.feasibility
+        absolute, relative = doubleArray(1), doubleArray(1)
+        absolute_index, relative_index = intArray(1), intArray(1)
+        for condition in (GLP_KKT_PE, GLP_KKT_PB):
+            glp_check_kkt(self.problem, GLP_MIP, condition,
+                          absolute, absolute_index, relative, relative_index)
+            if not (isfinite(absolute[0]) and isfinite(relative[0])
+                    and absolute[0] >= 0 and relative[0] >= 0):
+                return False
+            if not (absolute[0] <= tolerance or relative[0] <= tolerance):
+                return False
+        return True
+
     def _optimize(self):
         glp_scale_prob(self.problem, GLP_SF_AUTO)
         status = self._run_glp_simplex()
@@ -711,12 +728,23 @@ class Model(interface.Model, metaclass=inheritdocstring):
             self.configuration.presolve = True
         if self._glpk_is_mip():
             status = self._run_glp_mip()
-            if status == 'undefined' or status == 'infeasible':
+            if status in (interface.UNDEFINED, interface.INFEASIBLE):
                 # Let's see if the presolver and some scaling can fix this issue
                 original_presolve_setting = self.configuration.presolve
-                self.configuration.presolve = True
-                status = self._run_glp_mip()
-                self.configuration.presolve = original_presolve_setting
+                try:
+                    self.configuration.presolve = True
+                    status = self._run_glp_mip()
+                finally:
+                    self.configuration.presolve = original_presolve_setting
+            if status == interface.OPTIMAL and not self._mip_solution_is_feasible():
+                original_presolve_setting = self.configuration.presolve
+                try:
+                    self.configuration.presolve = False
+                    status = self._run_glp_mip()
+                    if status == interface.OPTIMAL and not self._mip_solution_is_feasible():
+                        status = interface.UNDEFINED
+                finally:
+                    self.configuration.presolve = original_presolve_setting
         return status
 
     def _add_variables(self, variables):
