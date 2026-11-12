@@ -93,6 +93,20 @@ def _constraint_lb_and_ub_to_gurobi_sense_rhs_and_range_value(lb, ub):
     return sense, rhs, range_value
 
 
+def _get_solver_parameters(problem):
+    """Return the parameters of a Gurobi model that differ from their defaults, in the PRM format."""
+    with TemporaryFilename(suffix=".prm") as tmp_file_name:
+        problem.write(tmp_file_name)
+        with open(tmp_file_name) as tmp_file:
+            return tmp_file.read()
+
+
+def _set_solver_parameters(problem, parameters):
+    """Set the parameters of a Gurobi model, given in the PRM format."""
+    with TemporaryFilename(suffix=".prm", content=parameters) as tmp_file_name:
+        problem.read(tmp_file_name)
+
+
 class Variable(interface.Variable, metaclass=inheritdocstring):
     def __init__(self, name, *args, **kwargs):
         super(Variable, self).__init__(name, **kwargs)
@@ -605,7 +619,8 @@ class Model(interface.Model):
         repr_dict = {
             'lp': lp_form,
             'status': self.status,
-            'config': self.configuration.__getstate__()
+            'config': self.configuration.__getstate__(),
+            'parameters': _get_solver_parameters(self.problem)
         }
         return repr_dict
 
@@ -616,6 +631,8 @@ class Model(interface.Model):
         self.configuration = Configuration()
         self.configuration.problem = self
         self.configuration.__setstate__(repr_dict["config"])
+        if "parameters" in repr_dict:  # absent when pickled by optlang <= 1.9.1
+            _set_solver_parameters(problem, repr_dict["parameters"])
 
     def to_lp(self):
         self.problem.update()

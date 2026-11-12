@@ -675,6 +675,9 @@ class Configuration(interface.MathematicalProgrammingConfiguration):
         self._timeout = timeout
         self._presolve = presolve
         self._tolerances = Tolerances(self)
+        for key, val in kwargs.get("tolerances", {}).items():
+            if hasattr(self._tolerances, key):
+                setattr(self._tolerances, key, val)
         super(Configuration, self).__init__(*args, **kwargs)
         self.problem = problem
         if self.problem is not None:

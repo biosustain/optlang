@@ -985,12 +985,17 @@ class Configuration(object):
 
     @classmethod
     def clone(cls, config, problem=None, **kwargs):
+        return cls(problem=problem, **cls._get_parameters(config))
+
+    @classmethod
+    def _get_parameters(cls, config):
+        """Collect the parameters of a configuration as keyword arguments for the constructor."""
         properties = (k for k, v in inspect.getmembers(cls, predicate=inspect.isdatadescriptor) if
                       not k.startswith('__'))
         parameters = {property: getattr(config, property) for property in properties if hasattr(config, property)}
         if hasattr(config, "tolerances"):
             parameters["tolerances"] = config.tolerances.to_dict()
-        return cls(problem=problem, **parameters)
+        return parameters
 
     def __init__(self, problem=None, *args, **kwargs):
         self.problem = problem
@@ -1639,11 +1644,18 @@ class Model(object):
         self.update()
 
     def __getstate__(self):
-        return self.to_json()
+        state = self.to_json()
+        try:
+            state["configuration"] = self.interface.Configuration._get_parameters(self.configuration)
+        except NotImplementedError:  # solver-agnostic interface
+            pass
+        return state
 
     def __setstate__(self, state):
         self.__init__()
         self._init_from_json(state)
+        if "configuration" in state:  # absent when pickled by optlang <= 1.9.1
+            self.configuration = self.interface.Configuration(problem=self, **state["configuration"])
 
 
 if __name__ == '__main__':

@@ -182,6 +182,27 @@ else:
             self.assertEqual(self.model.configuration.tolerances.feasibility,
                              mod.configuration.tolerances.feasibility)
 
+        def test_pickle_keeps_configuration(self):
+            configuration = self.model.configuration
+            configuration.lp_method = "dual"
+            configuration.presolve = True
+            configuration.timeout = 60
+            configuration.tolerances.feasibility = 1e-8
+            configuration.tolerances.optimality = 1e-8
+            configuration.tolerances.integrality = 1e-8
+            from_pickle = pickle.loads(pickle.dumps(self.model)).configuration
+            self.assertEqual(from_pickle.lp_method, "dual")
+            self.assertEqual(from_pickle.presolve, True)
+            self.assertEqual(from_pickle.timeout, 60)
+            self.assertEqual(from_pickle.tolerances.to_dict(), configuration.tolerances.to_dict())
+
+        def test_pickle_keeps_parameters_set_on_problem(self):
+            self.model.problem.Params.Threads = 2
+            self.model.problem.Params.MIPGap = 0.05
+            from_pickle = pickle.loads(pickle.dumps(self.model)).problem
+            self.assertEqual(from_pickle.Params.Threads, 2)
+            self.assertEqual(from_pickle.Params.MIPGap, 0.05)
+
         def test_gurobi_add_variable(self):
             var = Variable('x')
             self.model.add(var)

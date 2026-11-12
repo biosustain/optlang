@@ -2,6 +2,15 @@
 
 Next Release
 -----
+* fix pickling and deep-copying of CPLEX models, which lost the tolerances, `lp_method`,
+  `qp_method`, and `solution_target`
+* fix pickling and deep-copying of GLPK models, which lost the integrality tolerance
+* fix pickling and deep-copying of CBC models and pickling and copying of SciPy models,
+  which lost the whole configuration
+* pickled and copied CPLEX and Gurobi models now keep the numeric parameters of the
+  underlying problem that differ from the defaults of the solver
+* pickled and copied GLPK models now keep the control parameters that were set directly
+  on the configuration
 
 1.9.1
 -----

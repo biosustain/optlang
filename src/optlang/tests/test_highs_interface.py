@@ -134,6 +134,26 @@ class HighsModelTestCase(abstract_test_cases.AbstractModelTestCase):
             [(constr.lb, constr.ub, constr.name) for constr in self.model.constraints],
         )
 
+    def test_pickle_keeps_configuration(self):
+        configuration = self.model.configuration
+        configuration.lp_method = "simplex"
+        configuration.presolve = False
+        configuration.timeout = 60
+        configuration.tolerances.feasibility = 1e-8
+        configuration.tolerances.mip_gap = 0.05
+        from_pickle = pickle.loads(pickle.dumps(self.model))
+        self.assertEqual(from_pickle.configuration.lp_method, "simplex")
+        self.assertEqual(from_pickle.configuration.presolve, False)
+        self.assertEqual(from_pickle.configuration.timeout, 60)
+        self.assertEqual(from_pickle.configuration.tolerances.to_dict(), configuration.tolerances.to_dict())
+        self.assertEqual(from_pickle.problem.getOptionValue("primal_feasibility_tolerance")[1], 1e-8)
+        self.assertEqual(from_pickle.problem.getOptionValue("mip_rel_gap")[1], 0.05)
+
+    def test_clone_keeps_tolerances(self):
+        self.model.configuration.tolerances.feasibility = 1e-8
+        model_copy = self.interface.Model.clone(self.model)
+        self.assertEqual(model_copy.configuration.tolerances.feasibility, 1e-8)
+
     def test_config_gets_copied_too(self):
         self.model.configuration.verbosity = 3
         self.model.configuration.timeout = 5

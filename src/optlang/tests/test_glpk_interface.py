@@ -147,6 +147,18 @@ class ConfigurationTestCase(abstract_test_cases.AbstractConfigurationTestCase):
         from_pickle = pickle.loads(pickle_string)
         self.assertEqual(value, from_pickle.tolerances.feasibility)
 
+    def test_pickle_keeps_control_parameters(self):
+        config = self.interface.Configuration()
+        config.tolerances.integrality = 1e-8
+        config._smcp.tol_dj = 1e-8
+        config._iocp.mip_gap = 0.05
+        config._smcp.tm_lim = 5000  # also set by the timeout
+        from_pickle = pickle.loads(pickle.dumps(config))
+        self.assertEqual(from_pickle.tolerances.integrality, 1e-8)
+        self.assertEqual(from_pickle._smcp.tol_dj, 1e-8)
+        self.assertEqual(from_pickle._smcp.tm_lim, 5000)
+        self.assertEqual(from_pickle._iocp.mip_gap, 0.05)
+
     def test_clone(self):
         config = self.interface.Configuration()
         config.tolerances.feasibility = 1e-01
@@ -173,6 +185,24 @@ class ModelTestCase(abstract_test_cases.AbstractModelTestCase):
                          [(var.lb, var.ub, var.name, var.type) for var in self.model.variables.values()])
         self.assertEqual([(constr.lb, constr.ub, constr.name) for constr in from_pickle.constraints],
                          [(constr.lb, constr.ub, constr.name) for constr in self.model.constraints])
+
+    def test_pickle_keeps_configuration(self):
+        configuration = self.model.configuration
+        configuration.presolve = True
+        configuration.timeout = 60
+        configuration.tolerances.feasibility = 1e-8
+        configuration.tolerances.integrality = 1e-8
+        from_pickle = pickle.loads(pickle.dumps(self.model))
+        self.assertIs(from_pickle.configuration.problem, from_pickle)
+        self.assertEqual(from_pickle.configuration.presolve, True)
+        self.assertEqual(from_pickle.configuration.timeout, 60)
+        self.assertEqual(from_pickle.configuration.tolerances.to_dict(), configuration.tolerances.to_dict())
+
+    def test_copy_does_not_share_configuration(self):
+        model_copy = copy.copy(self.model)
+        self.assertIsNot(model_copy.configuration, self.model.configuration)
+        self.assertIs(model_copy.configuration.problem, model_copy)
+        self.assertIs(self.model.configuration.problem, self.model)
 
     def test_config_gets_copied_too(self):
         self.assertEqual(self.model.configuration.verbosity, 0)
