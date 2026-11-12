@@ -672,7 +672,13 @@ class Configuration(interface.MathematicalProgrammingConfiguration):
 
     @property
     def timeout(self):
-        return self.problem.problem.settings["time_limit"]
+        """Time limit in seconds, or None when the solver is not limited."""
+        # 0 is the stored sentinel for no limit. A numeric 0 copied onto GLPK
+        # becomes a zero-millisecond limit.
+        limit = self.problem.problem.settings["time_limit"]
+        if limit == 0:
+            return None
+        return limit
 
     @timeout.setter
     def timeout(self, value):

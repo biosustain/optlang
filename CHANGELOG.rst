@@ -2,6 +2,7 @@
 
 Next Release
 -----
+* report an unlimited matrix-interface timeout as None, so cloning a hybrid model onto GLPK does not apply a zero time limit
 * validate GLPK optimal MIP primal equalities and bounds, retry invalid solutions
   without presolve, and report undefined if the retry is still invalid
 
